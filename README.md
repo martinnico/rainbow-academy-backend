@@ -1,95 +1,96 @@
-# Commerce API
+Rainbow Academy - Backend API 🌈📚
 
-A RESTful e-commerce backend built with **Java** and **Spring Boot**, featuring product catalog management, purchase tracking, user management, and JWT-based authentication.
+Rainbow Academy es el backend (API RESTful) para una plataforma de e-learning asincrónica especializada en la enseñanza del idioma inglés. Diseñado con una arquitectura limpia y modular, el sistema gestiona cursos por niveles, desbloqueo secuencial de lecciones mediante actividades interactivas (sopa de letras y quizzes), compras de ebooks y un sistema de seguridad granular basado en roles.
 
-## Features
+🛠️ Stack Tecnológico
 
-- **Product management** — full CRUD with filtering by category and color
-- **Purchase management** — create, update, and query purchases by user
-- **User management** — registration, login, and JWT token refresh
-- **JWT Authentication** — stateless auth with access and refresh tokens via Spring Security
-- **Custom exception handling** — domain-specific exceptions per entity
+Lenguaje: Java (Jakarta EE)
 
-## Tech Stack
+Framework Principal: Spring Boot 3.x
 
-| Layer | Technology |
-|---|---|
-| Language | Java 17 |
-| Framework | Spring Boot 3.5 |
-| Security | Spring Security + JWT (jjwt 0.12.6) |
-| Persistence | Spring Data JPA + Hibernate |
-| Database | MySQL 8 |
-| Utilities | Lombok |
-| Build tool | Maven |
+Seguridad: Spring Security + JSON Web Tokens (JWT) para autenticación Stateless.
 
-## Project Structure
+Persistencia: Spring Data JPA / Hibernate
 
-```
-src/main/java/com/olivo/commerce/
-├── config/         # Security config and JWT filter
-├── controller/     # REST controllers (Producto, Compra, Usuario, Auth)
-├── dto/            # Request and response DTOs
-├── entity/         # JPA entities (Producto, Compra, Usuario, CompraProducto)
-├── exception/      # Custom domain exceptions
-├── repository/     # Spring Data JPA repositories
-└── service/        # Business logic layer with interfaces
-```
+Base de Datos: MySQL
 
-## API Endpoints
+Herramientas: Maven, Lombok (para reducción de boilerplate)
 
-### Auth
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/auth/register` | Register a new user |
-| POST | `/auth/login` | Login and receive JWT |
-| POST | `/auth/refresh` | Refresh access token |
+🏗️ Arquitectura y Capas
 
-### Products
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/productos/traerProductos` | Get all products |
-| GET | `/api/productos/traerProducto/{id}` | Get product by ID |
-| GET | `/api/productos/encontrarPorCategoria/{categoria}` | Filter by category |
-| GET | `/api/productos/encontrarPorColor/{color}` | Filter by color |
-| POST | `/api/productos/agregarProducto` | Create product |
-| PUT | `/api/productos/modificarProducto/{id}` | Update product |
-| DELETE | `/api/productos/borrarProducto/{id}` | Delete product |
+El proyecto sigue estrictamente una Arquitectura en Capas (Layered Architecture) y cumple con los principios de diseño REST y la Tercera Forma Normal (3FN) en su base de datos. NUNCA se exponen entidades en los controladores; toda la comunicación cliente-servidor se realiza a través de DTOs (Data Transfer Objects).
 
-### Purchases
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/compras/traerTodos` | Get all purchases |
-| GET | `/api/compras/traerCompra/{id}` | Get purchase by ID |
-| GET | `/api/compras/traerCompraUsuario/{nombre}` | Get purchases by user |
-| POST | `/api/compras/agregarCompra` | Create purchase |
-| PUT | `/api/compras/modificarCompra/{id}` | Update purchase |
-| DELETE | `/api/compras/eliminarCompra/{id}` | Delete purchase |
+controller: Endpoints REST expuestos al frontend (Next.js).
 
-## Getting Started
+service: Lógica de negocio (ej. Motor de desbloqueo, cálculos de puntaje).
 
-### Prerequisites
+repository: Interfaces JPA para el acceso a datos.
 
-- Java 17+
-- MySQL 8
-- Maven
+entity: Modelos de la base de datos.
 
-### Setup
+dto: Records de Java para peticiones y respuestas seguras.
 
-1. Clone the repository
-2. Create a MySQL database named `olivo`
-3. Set the following environment variable:
-```bash
-export JWT_SECRET=your_secret_key_here
-```
-4. Update `src/main/resources/application.properties` with your DB credentials if needed
-5. Run the application:
-```bash
-./mvnw spring-boot:run
-```
+security: Filtros JWT, configuración CORS y configuración RBAC.
 
-The API will be available at `http://localhost:8080`
+exception: Manejo global de errores (RestControllerAdvice).
 
-## Status
+🧩 Módulos Principales
 
-🚧 In progress — core CRUD and authentication implemented. Pending: input validation, pagination, and role-based access control.# rainbow-academy-backend
-# rainbow-academy-backend
+Autenticación y Seguridad (RBAC): Sistema basado en JWT. Define dos roles principales: TEACHER (acceso al panel de administración para crear contenido) y STUDENT (consumo de clases y juegos).
+
+Gestión de Cursos y Lecciones: Organización de contenido en niveles (Principiante, Intermedio, Avanzado).
+
+Actividades Interactivas: Motor flexible para vincular una lección con un juego específico (WORD_SEARCH o QUIZ). La lógica de la cuadrícula gráfica de la sopa de letras se delega al frontend; el backend gestiona las palabras clave y la validación.
+
+Motor de Progreso Secuencial: Sistema que evalúa el puntaje del alumno tras realizar una actividad. Si el score es mayor o igual al minPassScore, marca la lección actual como COMPLETED y desbloquea automáticamente la siguiente (UNLOCKED).
+
+Ebooks Digitales: Módulo de tienda que permite la compra y validación de acceso a material en PDF.
+
+🚀 Instalación y Ejecución Local
+
+1. Requisitos Previos
+
+Java 17 o superior.
+
+Maven instalado.
+
+MySQL Server corriendo localmente (ej. XAMPP, WampServer o Docker) en el puerto 3306.
+
+2. Configuración de la Base de Datos
+
+Crear una base de datos vacía en MySQL llamada rainbow_academy_db. Opcionalmente, Spring Boot la creará si se mantiene el parámetro en la URL de conexión.
+
+Configurar las credenciales en src/main/resources/application.properties:
+
+spring.datasource.url=jdbc:mysql://localhost:3306/rainbow_academy_db?createDatabaseIfNotExist=true&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=tu_contraseña_aqui
+
+# Hibernate auto-creará las tablas
+spring.jpa.hibernate.ddl-auto=update
+
+
+3. Compilación y Ejecución
+
+Ejecutar el siguiente comando en la raíz del proyecto para limpiar builds antiguos y levantar el servidor:
+
+mvn clean spring-boot:run
+
+
+La API estará disponible en http://localhost:8080.
+
+🔐 Credenciales por Defecto (DataInitializer)
+
+El proyecto incluye un script que puebla automáticamente la base de datos al arrancar por primera vez, creando los roles y usuarios de prueba:
+
+Rol Profesora (Admin):
+
+Email: profesora@rainbow.com
+
+Password: Admin1234!
+
+Rol Alumno (Estudiante):
+
+Email: alumno@rainbow.com
+
+Password: Alumno1234!

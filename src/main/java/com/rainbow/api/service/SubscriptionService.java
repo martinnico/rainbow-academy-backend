@@ -3,10 +3,16 @@ package com.rainbow.api.service;
 import com.rainbow.api.dto.SubscriptionRequestDTO;
 import com.rainbow.api.dto.SubscriptionResponseDTO;
 import com.rainbow.api.entity.Course;
+import com.rainbow.api.entity.Lesson;
+import com.rainbow.api.entity.StudentProgress;
+import com.rainbow.api.entity.StudentProgressStatus;
 import com.rainbow.api.entity.Subscription;
+import com.rainbow.api.entity.SubscriptionStatus;
 import com.rainbow.api.entity.UserSec;
 import com.rainbow.api.exception.ResourceNotFoundException;
 import com.rainbow.api.repository.ICourseRepository;
+import com.rainbow.api.repository.ILessonRepository;
+import com.rainbow.api.repository.IStudentProgressRepository;
 import com.rainbow.api.repository.ISubscriptionRepository;
 import com.rainbow.api.repository.IUserRepository;
 import jakarta.transaction.Transactional;
@@ -21,11 +27,19 @@ public class SubscriptionService implements ISubscriptionService {
     private final ISubscriptionRepository subscriptionRepository;
     private final IUserRepository userRepository;
     private final ICourseRepository courseRepository;
+    private final ILessonRepository lessonRepository;
+    private final IStudentProgressRepository studentProgressRepository;
 
-    public SubscriptionService(ISubscriptionRepository subscriptionRepository, IUserRepository userRepository, ICourseRepository courseRepository) {
+    public SubscriptionService(ISubscriptionRepository subscriptionRepository,
+                              IUserRepository userRepository,
+                              ICourseRepository courseRepository,
+                              ILessonRepository lessonRepository,
+                              IStudentProgressRepository studentProgressRepository) {
         this.subscriptionRepository = subscriptionRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
+        this.lessonRepository = lessonRepository;
+        this.studentProgressRepository = studentProgressRepository;
     }
 
     @Override
@@ -42,14 +56,26 @@ public class SubscriptionService implements ISubscriptionService {
     public SubscriptionResponseDTO create(SubscriptionRequestDTO requestDTO) {
         Subscription subscription = new Subscription();
         applyRequest(subscription, requestDTO);
-        return toResponse(subscriptionRepository.save(subscription));
+        Subscription savedSubscription = subscriptionRepository.save(subscription);
+
+        if (savedSubscription.getStatus() == SubscriptionStatus.ACTIVE) {
+            initializeCourseProgress(savedSubscription.getStudent(), savedSubscription.getCourse().getId());
+        }
+
+        return toResponse(savedSubscription);
     }
 
     @Override
     public SubscriptionResponseDTO update(Long id, SubscriptionRequestDTO requestDTO) {
         Subscription subscription = findByIdOrThrow(id);
         applyRequest(subscription, requestDTO);
-        return toResponse(subscriptionRepository.save(subscription));
+        Subscription savedSubscription = subscriptionRepository.save(subscription);
+
+        if (savedSubscription.getStatus() == SubscriptionStatus.ACTIVE) {
+            initializeCourseProgress(savedSubscription.getStudent(), savedSubscription.getCourse().getId());
+        }
+
+        return toResponse(savedSubscription);
     }
 
     @Override
@@ -71,6 +97,33 @@ public class SubscriptionService implements ISubscriptionService {
     private Course findCourseByIdOrThrow(Long id) {
         return courseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
+    }
+
+    private void initializeCourseProgress(UserSec student, Long courseId) {
+        List<Lesson> lessons = lessonRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
+        if (lessons.isEmpty()) {
+            return;
+        }
+
+        Lesson firstLesson = lessons.get(0);
+        ensureProgress(student, firstLesson, StudentProgressStatus.UNLOCKED);
+
+        for (int i = 1; i < lessons.size(); i++) {
+            ensureProgress(student, lessons.get(i), StudentProgressStatus.LOCKED);
+        }
+    }
+
+    private void ensureProgress(UserSec student, Lesson lesson, StudentProgressStatus status) {
+        StudentProgress progress = studentProgressRepository.findByStudentIdAndLessonId(student.getId(), lesson.getId())
+                .orElseGet(() -> StudentProgress.builder()
+                        .student(student)
+                        .lesson(lesson)
+                        .status(StudentProgressStatus.LOCKED)
+                        .score(0)
+                        .build());
+
+        progress.setStatus(status);
+        studentProgressRepository.save(progress);
     }
 
     private void applyRequest(Subscription subscription, SubscriptionRequestDTO requestDTO) {

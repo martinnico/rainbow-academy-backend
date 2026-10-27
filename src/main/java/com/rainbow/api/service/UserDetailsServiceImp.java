@@ -1,8 +1,12 @@
 package com.rainbow.api.service;
 
 import com.rainbow.api.dto.AuthLoginRequestDTO;
+import com.rainbow.api.dto.AuthRegisterRequestDTO;
 import com.rainbow.api.dto.AuthResponseDTO;
+import com.rainbow.api.entity.Role;
 import com.rainbow.api.entity.UserSec;
+import com.rainbow.api.exception.ResourceNotFoundException;
+import com.rainbow.api.repository.IRoleRepository;
 import com.rainbow.api.repository.IUserRepository;
 import com.rainbow.api.utils.JwtUtils;
 import jakarta.validation.Valid;
@@ -19,17 +23,21 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class UserDetailsServiceImp implements UserDetailsService {
 
     private final IUserRepository userRepository;
+    private final IRoleRepository roleRepository;
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
 
-    public UserDetailsServiceImp(IUserRepository userRepository, JwtUtils jwtUtils, PasswordEncoder passwordEncoder) {
+    public UserDetailsServiceImp(IUserRepository userRepository, IRoleRepository roleRepository, JwtUtils jwtUtils, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
         this.jwtUtils = jwtUtils;
         this.passwordEncoder = passwordEncoder;
     }
@@ -63,7 +71,6 @@ public class UserDetailsServiceImp implements UserDetailsService {
     }
 
     public AuthResponseDTO loginUser(@Valid AuthLoginRequestDTO authLoginRequest) {
-        // recuperar el usuario y contraseña
         String username = authLoginRequest.username();
         String password = authLoginRequest.password();
 
@@ -71,8 +78,42 @@ public class UserDetailsServiceImp implements UserDetailsService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String accessToken = jwtUtils.createToken(authentication);
-        AuthResponseDTO authResponseDTO = new AuthResponseDTO(username,"Login exitoso", accessToken, true);
-        return authResponseDTO;
+        return new AuthResponseDTO(username, "Login exitoso", accessToken, true);
+    }
+
+    public AuthResponseDTO registerUser(@Valid AuthRegisterRequestDTO authRegisterRequest) {
+        String username = authRegisterRequest.username();
+
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new IllegalArgumentException("El email ya está registrado");
+        }
+
+        Role studentRole = roleRepository.findByRole("STUDENT")
+                .orElseThrow(() -> new ResourceNotFoundException("Role STUDENT no encontrado"));
+
+        UserSec newUser = UserSec.builder()
+                .username(username)
+                .fullName(authRegisterRequest.fullName())
+                .password(passwordEncoder.encode(authRegisterRequest.password()))
+                .graduated(false)
+                .enabled(true)
+                .accountNonExpired(true)
+                .accountNonLocked(true)
+                .credentialsNonExpired(true)
+                .rolesList(new HashSet<>(Set.of(studentRole)))
+                .build();
+
+        userRepository.save(newUser);
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                username,
+                newUser.getPassword(),
+                getAuthorities(newUser)
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String accessToken = jwtUtils.createToken(authentication);
+        return new AuthResponseDTO(username, "Registro exitoso", accessToken, true);
     }
 
     public Authentication authenticate (String username, String password){
@@ -82,5 +123,14 @@ public class UserDetailsServiceImp implements UserDetailsService {
         }
 
         return new UsernamePasswordAuthenticationToken(username, userDetails.getPassword(), userDetails.getAuthorities());
+    }
+
+    private List<SimpleGrantedAuthority> getAuthorities(UserSec userSec) {
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        userSec.getRolesList().forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_".concat(role.getRole()))));
+        userSec.getRolesList().stream()
+                .flatMap(role -> role.getPermissionsList().stream())
+                .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission.getPermissionName())));
+        return authorities;
     }
 }
